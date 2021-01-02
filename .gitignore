@@ -130,3 +130,7 @@ dmypy.json
 
 #ideaProjects
 .idea
+
+#project specific
+unused_data/
+data/
