@@ -27,7 +27,7 @@ def getDirector(x):
 
 # Returns the list top n elements or entire list; whichever is more.
 def getList(x):
-    number_of_items = 2
+    number_of_items = 1
     if isinstance(x, list):
         names = [i['name'] for i in x]
         #Check if more than 3 elements exist. If yes, return only first three. If no, return entire list.
@@ -38,9 +38,8 @@ def getList(x):
     #Return empty list in case of missing/malformed data
     return []
 
-def getAndProcessData():
+def getAndProcessData(nrows):
     # whole data is more that 46 000 rows, we need to cut it
-    nrows = 100
 
     # read data
     credits = pd.read_csv('data/credits.csv', nrows=nrows)
@@ -99,8 +98,8 @@ def getAndProcessData():
     data = pd.concat([data, tmp], axis=1)
 
 
-    print(data.shape)
-    print(data.dtypes)
+    #print(data.shape)
+    #print(data.dtypes)
 
 
     # split
@@ -110,28 +109,25 @@ def getAndProcessData():
     # data.to_csv('tmp.csv')
     return train_test_split(data_X, data_Y, train_size=0.3)
 
-def XGB():
-
-    pass
-
-def NN():
-    pass
-
-
-if __name__ == '__main__':
-
+def XGB(depth, rounds, ):
     #data after initial processing
     #each algorithm can work on these and a process it further
-    train_X, test_X, train_y, test_y = getAndProcessData()
+    train_X, test_X, train_y, test_y = getAndProcessData(1001)
+
 
     # Instantiation
-    xgb_r = xgb.XGBRegressor(objective='reg:squarederror',
-                             max_depth=5,
+    xgb_r = xgb.XGBRegressor(objective='reg:squarederror', #reg:squarederror, reg:squaredlogerror, reg:squaredlogerror, reg:pseudohubererror
+                             n_estimators=100,
+                             seed=123,
+                             max_depth=depth,
+                             booster='dart',#gbtree, gblinear, dart
+                             )
 
-                             n_estimators=10, seed=123)
 
     # Fitting the model
-    xgb_r.fit(train_X, train_y)
+    xgb_r.fit(train_X, train_y, verbose=True,
+              eval_set=[(test_X, test_y)],
+              early_stopping_rounds=30,)
 
     # Predict the model
     pred = xgb_r.predict(test_X)
@@ -139,4 +135,14 @@ if __name__ == '__main__':
     # RMSE Computation
     rmse = np.sqrt(MSE(test_y, pred))
     print("RMSE : % f" % (rmse))
+
+def NN():
+    pass
+
+
+if __name__ == '__main__':
+    XGB(15, 100)
+
+
+
 
