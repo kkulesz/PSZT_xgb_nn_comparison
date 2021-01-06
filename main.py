@@ -38,7 +38,7 @@ def getList(x):
     #Return empty list in case of missing/malformed data
     return []
 
-def getAndProcessData(nrows):
+def processData(nrows):
     # whole data is more that 46 000 rows, we need to cut it
 
     # read data
@@ -54,19 +54,20 @@ def getAndProcessData(nrows):
     movies_metadata = movies_metadata[pd.to_numeric(movies_metadata['id'], errors='coerce').notnull()]
     movies_metadata['id'] = movies_metadata['id'].astype(int)
 
-
-    # merge data into one table so we can learn
+    # merge data
     data = pd.merge(movies_metadata, credits, on='id', how='inner')
     data = pd.merge(data, keywords, on='id', how='inner')
 
+    # budget cannot be 0 or not int
+    data = data[pd.to_numeric(data['budget'], errors='coerce').notnull()]
+    data['budget'] = data['budget'].astype(int)
+    data = data[(data[['budget']] > 1000).all(axis=1)]
 
-
-    #parse JSON into: top3 actors, director, related genres, keywords
+    # parse JSON into: top3 actors, director, related genres, keywords
     features = ['cast', 'crew', 'keywords', 'genres']
     for feature in features:
         data[feature] = data[feature].apply(literal_eval)
     data['director'] = data['crew'].apply(getDirector)
-    data.drop(['crew', 'id', 'title', 'release_date'], axis=1, inplace=True)#no longer needed
     features = ['cast', 'keywords', 'genres']
     for feature in features:
         data[feature] = data[feature].apply(getList)
@@ -79,46 +80,40 @@ def getAndProcessData(nrows):
     data['original_language'].replace(' ', '_', regex=True, inplace=True)
     data = pd.get_dummies(data, columns=['original_language'])
 
-    #set actors as columns
+    # set actors as columns
     tmp = data['cast']
     tmp = pd.get_dummies(tmp.apply(pd.Series).stack()).sum(level=0)
-    data.drop(['cast'], axis=1, inplace=True)
     data = pd.concat([data, tmp], axis=1)
 
-    #set genres as columns
+    # set genres as columns
     tmp = data['genres']
     tmp = pd.get_dummies(tmp.apply(pd.Series).stack()).sum(level=0)
-    data.drop(['genres'], axis=1, inplace=True)
     data = pd.concat([data, tmp], axis=1)
 
-    #set keywords as columns
+    # set keywords as columns
     tmp = data['keywords']
     tmp = pd.get_dummies(tmp.apply(pd.Series).stack()).sum(level=0)
-    data.drop(['keywords'], axis=1, inplace=True)
     data = pd.concat([data, tmp], axis=1)
 
+    # drop unnecessary
+    data.drop(['crew', 'id', 'title', 'release_date', 'cast', 'genres', 'keywords'],
+              axis=1, inplace=True)
 
-    #print(data.shape)
-    #print(data.dtypes)
+    data.to_csv('data/ready_data.csv')
+    return
 
-
-    # split
+def XGB(size, depth, rounds, early_stoppnig):
+    # data after initial processing
+    data = pd.read_csv('data/ready_data.csv', nrows=size)
     data_Y = data['vote_average']
     data_X = data.drop('vote_average', axis=1, inplace=False)
-
-    # data.to_csv('tmp.csv')
-    return train_test_split(data_X, data_Y, train_size=0.3)
-
-def XGB(depth, rounds, ):
-    #data after initial processing
-    #each algorithm can work on these and a process it further
-    train_X, test_X, train_y, test_y = getAndProcessData(1001)
+    train_X, test_X, train_y, test_y = train_test_split(data_X, data_Y, train_size=0.3)
 
 
     # Instantiation
     xgb_r = xgb.XGBRegressor(objective='reg:squarederror', #reg:squarederror, reg:squaredlogerror, reg:squaredlogerror, reg:pseudohubererror
-                             n_estimators=100,
-                             seed=123,
+                             n_estimators=rounds,
+                             #seed=123,
                              max_depth=depth,
                              booster='dart',#gbtree, gblinear, dart
                              )
@@ -127,7 +122,7 @@ def XGB(depth, rounds, ):
     # Fitting the model
     xgb_r.fit(train_X, train_y, verbose=True,
               eval_set=[(test_X, test_y)],
-              early_stopping_rounds=30,)
+              early_stopping_rounds=early_stoppnig,)
 
     # Predict the model
     pred = xgb_r.predict(test_X)
@@ -141,7 +136,9 @@ def NN():
 
 
 if __name__ == '__main__':
-    XGB(15, 100)
+    #processData(30000)
+
+    XGB(2000, 20, 100, 20)
 
 
 
