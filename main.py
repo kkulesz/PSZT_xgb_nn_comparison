@@ -1,9 +1,3 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
 import matplotlib.pyplot as plt # plotting
 import numpy as np # linear algebra
 import os # accessing directory structure
@@ -14,6 +8,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # in order to not show warning
 import tensorflow as tf
 
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error as MSE
 from ast import literal_eval
 
@@ -27,7 +24,7 @@ def getDirector(x):
 
 # Returns the list top n elements or entire list; whichever is more.
 def getList(x):
-    number_of_items = 1
+    number_of_items = 3
     if isinstance(x, list):
         names = [i['name'] for i in x]
         #Check if more than 3 elements exist. If yes, return only first three. If no, return entire list.
@@ -99,46 +96,143 @@ def processData(nrows):
     data.drop(['crew', 'id', 'title', 'release_date', 'cast', 'genres', 'keywords'],
               axis=1, inplace=True)
 
+
+    data.columns = data.columns.str.replace(' ', '_')
+    #print(data.dtypes)
     data.to_csv('data/ready_data.csv')
     return
 
-def XGB(size, depth, rounds, early_stoppnig):
+def XGB(size):
     # data after initial processing
     data = pd.read_csv('data/ready_data.csv', nrows=size)
+
+    #drop columns that all has the same value, because the do not give any information
+    nunique = data.apply(pd.Series.nunique)
+    columns_to_drop = nunique[nunique == 1].index
+    data.drop(columns_to_drop, axis=1)
+
+
+    #prepare data for regression
     data_Y = data['vote_average']
     data_X = data.drop('vote_average', axis=1, inplace=False)
     train_X, test_X, train_y, test_y = train_test_split(data_X, data_Y, train_size=0.3)
+    #TODO:DMatrix
+
+    params1 = {
+        'max_depth' : [10, 20, 30],
+        'learning_rate' : [0, 0.25, 1.0],
+        'gamma' : [0, 0.25, 1.0],
+        'reg_lambda' : [0, 1.0, 10.0],
+        'scale_pos_weight': [1, 3, 5]
+    }# {'gamma': 1.0, 'learning_rate': 0.25, 'max_depth': 10, 'reg_lambda': 1.0, 'scale_pos_weight': 1}
+    params2 = {
+        'max_depth': [8, 10, 13],
+        'learning_rate': [0.25],
+        'gamma': [1.0, 2.0, 3.0],
+        'reg_lambda': [1.0],
+        'scale_pos_weight': [0.33, 0.66, 1.0]
+    }#{'gamma': 1.0, 'learning_rate': 0.25, 'max_depth': 13, 'reg_lambda': 1.0, 'scale_pos_weight': 0.33}
 
 
+    params3 = {
+        'max_depth': [12, 13, 14],
+        'learning_rate': [0.25],
+        'gamma': [1.0, 1.2, 1.4],
+        'reg_lambda': [1.0],
+        'scale_pos_weight': [0.25, 0.3, 0.35]
+    }# {'gamma': 1.2, 'learning_rate': 0.25, 'max_depth': 12, 'reg_lambda': 1.0, 'scale_pos_weight': 0.25}
+    params4 = {
+        'max_depth': [11, 12],
+        'learning_rate': [0.25],
+        'gamma': [1.2],
+        'reg_lambda': [1.0],
+        'scale_pos_weight': [0.22, 0.25, 0.28]
+    }  # {'gamma': 1.2, 'learning_rate': 0.25, 'max_depth': 11, 'reg_lambda': 1.0, 'scale_pos_weight': 0.22}
+
+    params5 = {
+        'max_depth': [11],
+        'learning_rate': [0.25],
+        'gamma': [1.2],
+        'reg_lambda': [1.0],
+        'scale_pos_weight': [0.21, 0.22, 0.23]
+    } # {'gamma': 1.2, 'learning_rate': 0.25, 'max_depth': 11, 'reg_lambda': 1.0, 'scale_pos_weight': 0.21}
+
+    params6 = {
+        'max_depth': [11],
+        'learning_rate': [0.25],
+        'gamma': [1.2],
+        'reg_lambda': [1.0],
+        'scale_pos_weight': [0.15, 0.20]
+    }
+
+    params7 = {
+        'max_depth': [11],
+        'learning_rate': [0.25],
+        'gamma': [1.2],
+        'reg_lambda': [1.0],
+        'scale_pos_weight': [0]
+    }
+
+
+    '''
+    FOR HYPERPARAMETERS
+    
     # Instantiation
     xgb_r = xgb.XGBRegressor(objective='reg:squarederror', #reg:squarederror, reg:squaredlogerror, reg:squaredlogerror, reg:pseudohubererror
-                             n_estimators=rounds,
-                             #seed=123,
-                             max_depth=depth,
+                             #n_estimators=rounds,
+                             missing=None,
                              booster='dart',#gbtree, gblinear, dart
                              )
 
+    optimal = GridSearchCV(
+        estimator=xgb_r,
+        param_grid=params7,
+        verbose=0,
+        n_jobs=1,
+        cv=5
+    )
+    optimal.fit(train_X, train_y, verbose=True,
+                eval_set=[(test_X, test_y)],
+                early_stopping_rounds=10,
+                # eval_metric='aucpr'
+                )
+    print(optimal.best_params_)
+    '''
 
-    # Fitting the model
-    xgb_r.fit(train_X, train_y, verbose=True,
-              eval_set=[(test_X, test_y)],
-              early_stopping_rounds=early_stoppnig,)
+
+
+
+
+
+
+
+    # training score
+    #train_score = xgb_r.score(train_X, train_y)
+    #print("Training score: ", train_score)
+
+    # cross validation score
+    #cross_validation_score = cross_val_score(xgb_r, train_X, train_y, cv=10)
+    #print("Cross validation score: ", cross_validation_score)
+
+
 
     # Predict the model
-    pred = xgb_r.predict(test_X)
+    #pred = xgb_r.predict(test_X)
 
     # RMSE Computation
-    rmse = np.sqrt(MSE(test_y, pred))
-    print("RMSE : % f" % (rmse))
+    #rmse = np.sqrt(MSE(test_y, pred))
+    #print("RMSE : % f" % (rmse))
 
 def NN():
     pass
 
 
 if __name__ == '__main__':
-    #processData(30000)
+    size = 5000
 
-    XGB(2000, 20, 100, 20)
+    #processData(size)
+
+    XGB(size=size)
 
 
 
