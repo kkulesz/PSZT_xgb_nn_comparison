@@ -179,7 +179,7 @@ def XGB(size):
 
     '''
     FOR HYPERPARAMETERS
-    
+
     # Instantiation
     xgb_r = xgb.XGBRegressor(objective='reg:squarederror', #reg:squarederror, reg:squaredlogerror, reg:squaredlogerror, reg:pseudohubererror
                              #n_estimators=rounds,
@@ -280,9 +280,8 @@ def NN(size):
     print(f"Test RMSE: {round(rmse, 3)}")
     print(f"Test loss: {round(loss, 3)}")
 
-
     preds = model.predict(x_test)
-    print("Preds"+str(preds))
+    print("Preds" + str(preds))
     diff = preds.flatten() - y_test
     abs_percDiff = np.abs(diff)
     print('diff = ', diff, 'abs_diff = ', abs_percDiff)
