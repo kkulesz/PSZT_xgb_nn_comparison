@@ -222,110 +222,77 @@ def NN(size):
     # data after initial processing
     data = pd.read_csv('data/ready_data_NN.csv', nrows=size)
     # drop columns that all has the same value, because the do not give any information
-    print(data.dtypes)
     nunique = data.apply(pd.Series.nunique)
     columns_to_drop = nunique[nunique == 1].index
     data.drop(columns_to_drop, axis=1)
     data.fillna(0, inplace=True)
-
+    # print(data.isnull().any(axis=0))
+    # return
     data_Y = data['vote_average']
     data_X = data.drop('vote_average', axis=1, inplace=False)
-    #data_X1 = np.asarray(data_X.loc[:, 'runtime']).astype(float)
-    #data_X2 = np.asarray(data_X.loc[:, data_X.columns != 'runtime']).astype(int)
-    #data_X1 = np.array(data_X1)[np.indices.astype(int)]
-    #print(data_X1[:10])
     x_train, x_test, y_train, y_test = train_test_split(data_X, data_Y, train_size=0.3)
 
-    x_train = np.asarray(x_train).astype(np.float32)
-    y_train = np.asarray(y_train).astype(np.float32)
-    x_test = np.asarray(x_test).astype(np.float32)
-    y_test = np.asarray(y_test).astype(np.float32)
-    print(x_train.dtype)
+    x_train = np.asarray(x_train).astype(np.float64)
+    y_train = np.asarray(y_train).astype(np.float64)
+    x_test = np.asarray(x_test).astype(np.float64)
+    y_test = np.asarray(y_test).astype(np.float64)
     # create model
-    inputs = keras.Input(shape=(6187,), name="digits")
-    x = layers.Dense(64, activation="relu", name="dense_1")(inputs)
-    x = layers.Dense(64, activation="relu", name="dense_2")(x)
-    outputs = layers.Dense(10, activation="softmax", name="predictions")(x)
+    inputs = keras.Input(shape=(x_train.shape[1],), name="digits")
+    x1 = layers.Dense(64, activation="relu", name="dense_1")(inputs)
+    x1 = layers.LayerNormalization()(x1)
+    x2 = layers.Dense(32, activation="relu", name="dense_2")(x1)
+    x2 = layers.LayerNormalization()(x2)
+    outputs = layers.Dense(1, activation="relu", name="predictions")(x2)
 
     model = keras.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss='mse', optimizer='adam', metrics=[keras.metrics.mean_absolute_error])
+    print(model.summary())
 
     print(x_train.shape)
+    print(y_train.shape)
     # Reserve 10,000 samples for validation
-    x_val = x_train[-500:]
-    y_val = y_train[-500:]
-    x_train = x_train[:-500]
-    y_train = y_train[:-500]
-
+    x_val = x_train[-100:]
+    y_val = y_train[-100:]
+    x_train = x_train[:-100]
+    y_train = y_train[:-100]
+    print(x_train[:3])
     model.compile(
-        optimizer=keras.optimizers.Adam(),  # Optimizer
+        optimizer=keras.optimizers.Adam(learning_rate=0.01),  # Optimizer
         # Loss function to minimize
-        loss='mean_squared_error',
+        loss=keras.losses.mean_squared_error,
         # List of metrics to monitor
-        metrics=['accuracy'],
+        metrics=[keras.metrics.mean_squared_error],
     )
     print("Fit model on training data")
-    print(x_train[:10])
+    # print(x_train[:10])
     history = model.fit(
         x_train,
         y_train,
         batch_size=32,
-        epochs=10,
+        epochs=5,
         # We pass some validation for
         # monitoring validation loss and metrics
         # at the end of each epoch
         validation_data=(x_val, y_val),
     )
-    '''
-    data_X['adult'] = np.asarray(data_X['adult']).astype(int)
-    data_X['budget'] = np.asarray(data_X['budget']).astype(int)
-    data_X['vote_count'] = np.asarray(data_X['vote_count']).astype(int)
-    data_X['runtime'] = np.asarray(data_X['runtime']).astype(int)
-    
-    # assert not data_X['David_Hewlett'].isnull().values.any()
-    data_X = np.asarray(data_X).astype(float)
-    data_Y = np.asarray(data_Y).astype(float)
-    train_X.reshape()
 
-    print(train_X.shape[1])
-    model = tf.keras.models.Sequential()
-    model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(8, input_dim=train_X.shape[0], activation=tf.nn.relu))
-    model.add(tf.keras.layers.Dense(4, activation=tf.nn.relu))
-    model.add(tf.keras.layers.Dense(1, activation="linear"))
-    model.compile(optimizer='adam', loss='mean_absolute_percentage_error',
-                  metrics='accuracy')
-    model.build(input_shape=train_X.shape)
-    # print(model.summary())
-    model.fit(x=train_X, y=train_y, epochs=10)
-'''
+    loss, rmse = model.evaluate(x_test, y_test, verbose=1)
+    print(f"Test RMSE: {round(rmse, 3)}")
+    print(f"Test loss: {round(loss, 3)}")
+
 
     preds = model.predict(x_test)
-    # diff = preds.flatten() - y_test
-    # percentdiff = (diff / y_test) * 100
-    # abs_percDiff = np.abs(percentdiff)
-    # print('diff = ', diff, 'percentDiff = ', percentdiff, 'abs_diff = ', abs_percDiff)
-    '''
-    vocabulary_size = 500
-    tokenize = keras.preprocessing.text.Tokenizer(num_words=vocabulary_size, char_level=False)
-    tokenize.fit_on_texts(train_X['vote_count'])
-    vote_count_bow_train = tokenize.texts_to_matrix(train_X['vote_count'])
-    vote_count_bow_test = tokenize.texts_to_matrix(test_X['vote_count'])
-
-    encoder = LabelEncoder()
-    encoder.fit(train_X['vote_count'])
-    vote_count_train = encoder.transform(train_X['vote_count'])
-    vote_count_test = encoder.transform(test_X['vote_count'])
-    num_classes = np.max(vote_count_train) + 1
-
-    # converting to one-hot
-    vote_count_train = keras.utils.to_categorical(vote_count_train, num_classes)
-    vote_count_test = keras.utils.to_categorical(vote_count_test, num_classes)
-    '''
-    pass
+    print("Preds"+str(preds))
+    diff = preds.flatten() - y_test
+    abs_percDiff = np.abs(diff)
+    print('diff = ', diff, 'abs_diff = ', abs_percDiff)
+    plt.plot(history.history['mean_squared_error'], label='train')
+    plt.plot(history.history['val_mean_squared_error'], label='test')
+    plt.show()
 
 
 if __name__ == '__main__':
-    size = 5000
+    size = 20000
 
     # processData(size)
 
